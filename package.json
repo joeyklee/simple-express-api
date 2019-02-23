@@ -1,0 +1,27 @@
+{
+  "name": "simple-express-api",
+  "version": "0.0.1",
+  "description": "A simple express API for ITPs QH19 course",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/joeyklee/simple-express-api.git"
+  },
+  "author": "joeyklee",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/joeyklee/simple-express-api/issues"
+  },
+  "homepage": "https://github.com/joeyklee/simple-express-api#readme",
+  "dependencies": {
+    "express": "^4.16.4"
+  },
+  "devDependencies": {
+    "nodemon": "^1.18.10"
+  }
+}
