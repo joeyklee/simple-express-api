@@ -1157,11 +1157,27 @@ app.listen(3030, () => {
 })
 ```
 
-We now have to update our PUT and our DELETE endpoints. 
+**We now have to update our PUT and our DELETE endpoints.** 
 
 ## Refactor PUT
 
 See: https://github.com/louischatriot/nedb#updating-documents
+
+As we saw earlier, the way updates work are to:
+1. get an id or some kind of selector property
+2. then send the data we want to update.
+
+In our example we select a specific object in our database based on its `_id` -- remember, nedb is now generating unique ids for us -- and send in our data that we want updated. 
+
+In the noSQL database universe, there are a couple ways to do an update:
+1. you can replace the entire object with a new one or
+2. you can $set the properties you want updated.
+
+The $set syntax is a convention in mongodb and nedb (and perhaps other noSQL databases) that says, "based on the selection, update the properties that I've specied based on this data".
+
+Below you can see the snippet. 
+
+One other thing you'll notice here is that we use `response.redirect('/api')` after updating our data. We first check for errors, but if all is successful, return our entire updated data. 
 
 ```js
 
@@ -1174,6 +1190,9 @@ app.put("/api/:id", (request, response)=> {
     
    // Set an existing field's value
    db.update({ _id: selectedItemId  }, { $set: updatedDataProperties }, (err, numReplaced) => {
+       if(err){
+           response.status(404).send("uh oh! something went wrong on update");
+       }
         // redirect to "GET" all the latest data
         response.redirect("/api")
    });
@@ -1186,7 +1205,9 @@ app.put("/api/:id", (request, response)=> {
 
 ## Refactor DELETE
 
-Lastly we refactor our DELETE method with the following
+Lastly we refactor our DELETE method with the following snippet. You'll notice a similar structure to the PUT request except that instead of sending data to update, we're just selecting the `_id` and removing it. Again we redirect to the "GET" endpoint which sends back all the data. 
+
+So far we're only deleting one feature at a time based on an `_id` but it is totally possible to delete many features based on a shared property, or just all the things in your database. You can check the nedb documentation on how to do this.
 
 ```js
 
@@ -1195,7 +1216,10 @@ app.delete('/api/:id', (request, response) => {
     const selectedItemId = request.params.id;
 
     db.remove({ _id: selectedItemId }, {}, function (err, numRemoved) {
-     // numRemoved = 1
+        if(err){
+           response.status(404).send("uh oh! something went wrong on delete");
+          }
+         // numRemoved = 1
          response.redirect("/api")
       });
 
@@ -1208,9 +1232,803 @@ app.delete('/api/:id', (request, response) => {
 
 **🌈 and there you have it! you've just built a full CRUD API with express**.
 
+## For full CRUD api code
+
+```js
+const express = require('express');
+
+const path = require('path');
+// Type 3: Persistent datastore with automatic loading
+const Datastore = require('nedb');
+const pathToData = path.resolve(__dirname, "db/db")
+const db = new Datastore({ filename: pathToData});
+db.loadDatabase();
+
+const app = express();
+
+// Handling JSON data 
+app.use(express.json());       // to support JSON-encoded bodies
+app.use(express.urlencoded({extended:true})); // to support URL-encoded bodies
+
+
+app.get("/", (request, response) => {
+    response.send("hello lovely person");
+});
+
+// our API
+// GET - /api
+app.get("/api", (request, response) => {    
+    db.find({}, function (err, docs) {
+        if(err){
+            return err;
+        } 
+        response.json(docs);
+    });
+});
+
+// POST - /api
+app.post("/api", (request, response) => {
+    // our unix timestamp
+    const unixTimeCreated = new Date().getTime();
+    // add our unix time as a "created" property and add it to our request.body
+    const newData = Object.assign({"created": unixTimeCreated}, request.body)
+
+    // add in our data object to our database using .insert()
+    db.insert(newData, (err, docs) =>{
+        if(err){
+            return err;
+        }
+        response.json(docs);
+    });
+})
+
+
+// PUT - /api
+app.put("/api/:id", (request, response)=> {
+    // we get the id of the item we want from request.params.id ==> this matches the :id of the URL parameter
+    const selectedItemId = request.params.id;
+    const updatedDataProperties = request.body
+
+    
+   // Set an existing field's value
+   db.update({ _id: selectedItemId  }, { $set: updatedDataProperties }, (err, numReplaced) => {
+       if(err){
+           response.status(404).send("uh oh! something went wrong on update");
+       }
+        // redirect to "GET" all the latest data
+        response.redirect("/api")
+   });
+
+});
+
+// DELETE - /api
+app.delete('/api/:id', (request, response) => {
+    // we get the id of the item we want from request.params.id ==> this matches the :id of the URL parameter
+    const selectedItemId = request.params.id;
+
+    db.remove({ _id: selectedItemId }, {}, function (err, numRemoved) {
+        if(err){
+           response.status(404).send("uh oh! something went wrong on delete");
+          }
+         // numRemoved = 1
+         response.redirect("/api")
+      });
+
+})
+
+
+app.listen(3030, () => {
+    console.log("check out the magic at: http://localhost:3030")
+})
+```
+
+
 ***
 # A simple frontend and static web server
 ***
+
+Alighty, so last but not least, we want to build some kind of front end to our application. This will allow us and your users to interact with our API. Of course other developers could start using your API provided that you make some API documentation -- https://swagger.io/blog/api-documentation/what-is-api-documentation-and-why-it-matters/ -- but since we're creative people, let's make our own interface to this application.
+
+There are many ways to build interfaces - we're going to keep it simple with HTML5, using p5.js of course since we <3 p5. 
+
+## Create a static web server 
+
+In order to serve static files from our current server, we need to be able to tell our express application to send static files such as an index.html, sketch.js, images, etc based on a directory on your server. 
+
+The common way to do this is to set a `public` directory where all your public assets will live. Public assets can be things like images, css style sheets, your index.html, your sketch.js files, etc. 
+
+Let's add this to our express code. Here's where this code snippet will live.
+
+An important thing to note in Express is that the order you define "middleware" matters. Here we define early on in our express applicaton that Express should *use the public folder to serve static assets*. Therefore when you run the `response.sendFile()` the files sent to the client will be from the public folder.
+
+```js
+/** a bunch of our code above */
+
+const app = express();
+
+// Send files from the public directory
+app.use(express.static( path.resolve(__dirname, 'public') ));
+
+// Handling JSON data 
+app.use(express.json());       // to support JSON-encoded bodies
+app.use(express.urlencoded({extended:true})); // to support URL-encoded bodies
+
+/** a bunch of our code below */
+
+```
+
+Now we can create a folder called `public` in our root directory:
+
+![image of creating a public folder in root]()
+![image of creating a public folder in root]()
+
+And last create an `index.html` and `sketch.js` file with some boilerplate p5.js code to start.
+
+In index.html
+
+```html
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Simple Express API with P5.js</title>
+    <style type="text/css">
+    * {
+        font-family: 'Monaco'
+    }
+    </style>
+</head>
+<body>
+    <h1>Simple CRUD API with Express</h1>
+    <!-- p5 libraries -->
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.7.3/p5.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.7.3/addons/p5.dom.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.7.3/addons/p5.sound.min.js"></script>
+    <!-- your p5 sketch -->
+    <script type="text/javascript" src="sketch.js"></script>
+</body>
+
+</html>
+```
+
+and add a sketch.js file
+
+```js
+function setup(){
+    createCanvas(400, 400);
+
+}
+
+function draw(){
+    background(200);
+
+}
+
+```
+
+and last but not least, when a user goes to your root URL, they should recieve your `index.html` file from your server. To do this, let's tell express to `.sendFile()` when users navigate to the root URL at `/` :
+
+```js
+app.get("/", (request, response) => {
+    response.sendFile("index.html");
+});
+
+```
+
+Your entire code will look like this now:
+
+```js
+
+const express = require('express');
+
+const path = require('path');
+// Type 3: Persistent datastore with automatic loading
+const Datastore = require('nedb');
+const pathToData = path.resolve(__dirname, "db/db")
+const db = new Datastore({ filename: pathToData});
+db.loadDatabase();
+
+const app = express();
+
+// Send files from the public directory
+app.use(express.static( path.resolve(__dirname, 'public') ));
+
+// Handling JSON data 
+app.use(express.json());       // to support JSON-encoded bodies
+app.use(express.urlencoded({extended:true})); // to support URL-encoded bodies
+
+
+app.get("/", (request, response) => {
+    response.sendFile("index.html");
+});
+
+// our API
+// GET - /api
+app.get("/api", (request, response) => {    
+    db.find({}, function (err, docs) {
+        if(err){
+            return err;
+        } 
+        response.json(docs);
+    });
+});
+
+// POST - /api
+app.post("/api", (request, response) => {
+    // our unix timestamp
+    const unixTimeCreated = new Date().getTime();
+    // add our unix time as a "created" property and add it to our request.body
+    const newData = Object.assign({"created": unixTimeCreated}, request.body)
+
+    // add in our data object to our database using .insert()
+    db.insert(newData, (err, docs) =>{
+        if(err){
+            return err;
+        }
+        response.json(docs);
+    });
+})
+
+
+// PUT - /api
+app.put("/api/:id", (request, response)=> {
+    // we get the id of the item we want from request.params.id ==> this matches the :id of the URL parameter
+    const selectedItemId = request.params.id;
+    const updatedDataProperties = request.body
+
+    
+   // Set an existing field's value
+   db.update({ _id: selectedItemId  }, { $set: updatedDataProperties }, (err, numReplaced) => {
+       if(err){
+           response.status(404).send("uh oh! something went wrong on update");
+       }
+        // redirect to "GET" all the latest data
+        response.redirect("/api")
+   });
+
+});
+
+// DELETE - /api
+app.delete('/api/:id', (request, response) => {
+    // we get the id of the item we want from request.params.id ==> this matches the :id of the URL parameter
+    const selectedItemId = request.params.id;
+
+    db.remove({ _id: selectedItemId }, {}, function (err, numRemoved) {
+        if(err){
+           response.status(404).send("uh oh! something went wrong on delete");
+          }
+         // numRemoved = 1
+         response.redirect("/api")
+      });
+
+})
+
+
+app.listen(3030, () => {
+    console.log("check out the magic at: http://localhost:3030")
+})
+
+```
+
+Now go to your web browser and check: `localhost:3030/` and see that your sketch us being served at the root URL. This is just delightful.
+
+![image of blank sketch]()
+
+
+## Now we can write some javascript to interact with our API.
+
+Since we're using P5.js we've got a suite a tools at our disposal to making requests from the client. Let's explore some of those now.
+
+### GET
+We can use:
+1. loadJSON()
+2. httpGet()
+
+### POST, 
+we can use:
+1. httpPost(): https://p5js.org/reference/#/p5/httpPost
+
+# PUT, and DELETE
+We can use:
+1. fetch()
+
+Fetch() is a general purpose function for making API calls, but since p5 gives us some nice functions for GET and POST, we use those and then fetch() for the PUT and DELETE.
+
+
+## Requesting data from the client
+Remember we've so far been using Postman to do our API requests and shown that it works. Now we can start requesting data from our p5 sketch. 
+
+Let's request our data and render what is in our database in our canvas.
+
+In `sketch.js`
+```js
+let myData;
+
+function preload(){
+    // we request our data at the /api endpoint
+    myData = loadJSON("/api");
+}
+
+function setup(){
+    createCanvas(400, 400);
+    // NOTICE: the x, y values are now strings rather than integers
+    console.log(myData);
+}
+
+
+function draw(){
+    background(200);
+    
+    // NOTE: we get back JSON not an array
+    for(p in myData){
+        const item = myData[p];
+        const x = int(item.x)
+        const y = int(item.y)
+        fill(item.color);
+        ellipse(x, y, 40, 40)
+    }
+
+}
+```
+
+![image of colored circles on canvas]()
+
+
+## Posting data to our database
+
+Let's build a button that on click:
+1. sends a new object to our database specifying a color and x, y value
+2. updates the myData object in our sketch.
+
+Here we attach a function to a mousePressed event that says "every time this button is pressed, send some data up to the server and then update the myData object we created for ourselves"
+
+```js
+function handlePost(e){
+    console.log('adding new circle!')
+    let colorSelection = colors[floor(random(colors.length))]
+    let newCircle = {"color":colorSelection, "x": floor(random(width)), "y": floor(random(height)) }
+    httpPost("/api", newCircle, (result) => {
+        // the result logs the object you submited
+        console.log(result)
+        // get the latest data and update myData
+        myData = loadJSON("/api");
+    })
+}
+```
+
+In context all of our `sketch.js` will look like this. Notice that I've added a long array of colors to choose randomly from! 
+
+```js
+let myData;
+const colors = ["AliceBlue", "AntiqueWhite", "Aqua", "Aquamarine", "Azure", "Beige", "Bisque", "Black", "BlanchedAlmond", "Blue", "BlueViolet", "Brown", "BurlyWood", "CadetBlue", "Chartreuse", "Chocolate", "Coral", "CornflowerBlue", "Cornsilk", "Crimson", "Cyan", "DarkBlue", "DarkCyan", "DarkGoldenRod", "DarkGray", "DarkGrey", "DarkGreen", "DarkKhaki", "DarkMagenta", "DarkOliveGreen", "DarkOrange", "DarkOrchid", "DarkRed", "DarkSalmon", "DarkSeaGreen", "DarkSlateBlue", "DarkSlateGray", "DarkSlateGrey", "DarkTurquoise", "DarkViolet", "DeepPink", "DeepSkyBlue", "DimGray", "DimGrey", "DodgerBlue", "FireBrick", "FloralWhite", "ForestGreen", "Fuchsia", "Gainsboro", "GhostWhite", "Gold", "GoldenRod", "Gray", "Grey", "Green", "GreenYellow", "HoneyDew", "HotPink", "IndianRed", "Indigo", "Ivory", "Khaki", "Lavender", "LavenderBlush", "LawnGreen", "LemonChiffon", "LightBlue", "LightCoral", "LightCyan", "LightGoldenRodYellow", "LightGray", "LightGrey", "LightGreen", "LightPink", "LightSalmon", "LightSeaGreen", "LightSkyBlue", "LightSlateGray", "LightSlateGrey", "LightSteelBlue", "LightYellow", "Lime", "LimeGreen", "Linen", "Magenta", "Maroon", "MediumAquaMarine", "MediumBlue", "MediumOrchid", "MediumPurple", "MediumSeaGreen", "MediumSlateBlue", "MediumSpringGreen", "MediumTurquoise", "MediumVioletRed", "MidnightBlue", "MintCream", "MistyRose", "Moccasin", "NavajoWhite", "Navy", "OldLace", "Olive", "OliveDrab", "Orange", "OrangeRed", "Orchid", "PaleGoldenRod", "PaleGreen", "PaleTurquoise", "PaleVioletRed", "PapayaWhip", "PeachPuff", "Peru", "Pink", "Plum", "PowderBlue", "Purple", "RebeccaPurple", "Red", "RosyBrown", "RoyalBlue", "SaddleBrown", "Salmon", "SandyBrown", "SeaGreen", "SeaShell", "Sienna", "Silver", "SkyBlue", "SlateBlue", "SlateGray", "SlateGrey", "Snow", "SpringGreen", "SteelBlue", "Tan", "Teal", "Thistle", "Tomato", "Turquoise", "Violet", "Wheat", "White", "WhiteSmoke", "Yellow", "YellowGreen"];
+
+let postButton;
+
+function preload() {
+    myData = loadJSON("/api");
+}
+
+function setup() {
+    createCanvas(400, 400);
+    // NOTICE: the x, y values are now strings rather than integers
+    console.log(myData);
+
+    postButton = createButton("add new circle")
+    postButton.mousePressed(handlePost);
+
+}
+
+function handlePost(e) {
+    console.log('adding new circle!')
+    let colorSelection = colors[floor(random(colors.length))]
+    let newCircle = {
+        "color": colorSelection,
+        "x": floor(random(width)),
+        "y": floor(random(height))
+    }
+    httpPost("/api", newCircle, (result) => {
+        // the result logs the object you submited
+        console.log(result)
+        // get the latest data and update myData
+        myData = loadJSON("/api");
+    })
+}
+
+function draw() {
+    background(200);
+
+    // NOTE: we get back JSON not an array
+    for (p in myData) {
+        const item = myData[p];
+        const x = int(item.x)
+        const y = int(item.y)
+        fill(item.color);
+        ellipse(x, y, 40, 40)
+    }
+
+}
+```
+
+your view should now look something like this:
+
+![image of updating the circles shown on mousePressed of the button]()
+
+
+## Deleting Data
+
+Now let's say we want to remove some data from our database. We need to make a way to remove a circle from our canvas.
+
+We could do this in a bunch of ways, for example we could create circle objects that each contain the id, and when the circle is pressed, we can send a DELETE request to oru server. We could make a list of buttons with our data and remove each circle on click. Alternaitvely we could make a form input and send a delete based on a known ID. The world is our oyster. 
+
+For now probably the most exciting user experience would be to be able to click on a dot and remove it from the database. 
+
+let's make a new `class` and call it `Dot`. In Dot, we detect whether it intersects with the mouse and if so, then we remove it calling the `updateMyDots()` function defined up earlier in the code.
+
+```js
+class Dot{
+    constructor(_x, _y, _color, _id){
+        this.x = _x;
+        this.y = _y;
+        this.id = _id;
+        this.color = _color;
+        this.remove = this.remove.bind(this);
+    }
+
+    intersects(){
+        let d = dist(mouseX, mouseY, this.x, this.y);
+        if (d < 20) {
+            this.remove();
+          }
+    }
+
+    remove(){
+        // see issue with readable stream: https://stackoverflow.com/questions/40385133/retrieve-data-from-a-readablestream-object
+        console.log('removing!', this.id)
+        fetch(`/api/${this.id}`, {method:'DELETE'}).then( result => {
+            updateMyDots()
+        })
+    }
+
+    display(){
+        fill(this.color);
+        ellipse(this.x, this.y, 40, 40)
+    }
+}
+```
+
+Up to this point our code now looks like this.
+
+Notice: 
+1. We run a loop to check to see when the mousePressed event is fired whether or not the dot lives within 40 px of the mouse. If so, then we remove it.
+2. We use "fetch" which is a native browser method for making web requests - it seems that the P5 httpDo() method does not support the DELETE method yet.
+3. that our rendering of our dots is using the Dot class "display()" function. 
+4. We instantiate the Dots in the setup() and every time after we update our dots data
+
+```js
+let myData;
+let myDots = [];
+const colors = ["AliceBlue", "AntiqueWhite", "Aqua", "Aquamarine", "Azure", "Beige", "Bisque", "Black", "BlanchedAlmond", "Blue", "BlueViolet", "Brown", "BurlyWood", "CadetBlue", "Chartreuse", "Chocolate", "Coral", "CornflowerBlue", "Cornsilk", "Crimson", "Cyan", "DarkBlue", "DarkCyan", "DarkGoldenRod", "DarkGray", "DarkGrey", "DarkGreen", "DarkKhaki", "DarkMagenta", "DarkOliveGreen", "DarkOrange", "DarkOrchid", "DarkRed", "DarkSalmon", "DarkSeaGreen", "DarkSlateBlue", "DarkSlateGray", "DarkSlateGrey", "DarkTurquoise", "DarkViolet", "DeepPink", "DeepSkyBlue", "DimGray", "DimGrey", "DodgerBlue", "FireBrick", "FloralWhite", "ForestGreen", "Fuchsia", "Gainsboro", "GhostWhite", "Gold", "GoldenRod", "Gray", "Grey", "Green", "GreenYellow", "HoneyDew", "HotPink", "IndianRed", "Indigo", "Ivory", "Khaki", "Lavender", "LavenderBlush", "LawnGreen", "LemonChiffon", "LightBlue", "LightCoral", "LightCyan", "LightGoldenRodYellow", "LightGray", "LightGrey", "LightGreen", "LightPink", "LightSalmon", "LightSeaGreen", "LightSkyBlue", "LightSlateGray", "LightSlateGrey", "LightSteelBlue", "LightYellow", "Lime", "LimeGreen", "Linen", "Magenta", "Maroon", "MediumAquaMarine", "MediumBlue", "MediumOrchid", "MediumPurple", "MediumSeaGreen", "MediumSlateBlue", "MediumSpringGreen", "MediumTurquoise", "MediumVioletRed", "MidnightBlue", "MintCream", "MistyRose", "Moccasin", "NavajoWhite", "Navy", "OldLace", "Olive", "OliveDrab", "Orange", "OrangeRed", "Orchid", "PaleGoldenRod", "PaleGreen", "PaleTurquoise", "PaleVioletRed", "PapayaWhip", "PeachPuff", "Peru", "Pink", "Plum", "PowderBlue", "Purple", "RebeccaPurple", "Red", "RosyBrown", "RoyalBlue", "SaddleBrown", "Salmon", "SandyBrown", "SeaGreen", "SeaShell", "Sienna", "Silver", "SkyBlue", "SlateBlue", "SlateGray", "SlateGrey", "Snow", "SpringGreen", "SteelBlue", "Tan", "Teal", "Thistle", "Tomato", "Turquoise", "Violet", "Wheat", "White", "WhiteSmoke", "Yellow", "YellowGreen"]
+let postButton;
+
+function preload() {
+    myData = loadJSON("/api");
+}
+
+function setup() {
+    createCanvas(400, 400);
+    
+    // Initialize the view with myDots
+    // NOTICE: the x, y values are now strings rather than integers
+    console.log(myData);
+    for(p in myData){
+        const item = myData[p];
+        const x = int(item.x);
+        const y = int(item.y);
+        myDots.push( new Dot(item.x, item.y,item.color, item._id))
+    }
+
+    postButton = createButton("add new circle")
+    postButton.mousePressed(handlePost);
+
+}
+
+function handlePost(e) {
+    console.log('adding new circle!')
+    let colorSelection = colors[floor(random(colors.length))]
+    let newCircle = {
+        "color": colorSelection,
+        "x": floor(random(width)),
+        "y": floor(random(height))
+    }
+    httpPost("/api", newCircle, (result) => {
+        // the result logs the object you submited
+        console.log(result)
+        // get the latest data and update myData
+        updateMyDots()
+    })
+}
+
+function updateMyDots(){
+    // clear myDots
+    myDots = [];
+    loadJSON("/api", (result) =>{
+        myData = result;
+        for(p in myData){
+            const item = myData[p];
+            const x = int(item.x);
+            const y = int(item.y);
+            myDots.push( new Dot(item.x, item.y,item.color, item._id))
+        }
+    });
+}
+
+function draw() {
+    background(200);
+
+    // NOTE: we get back JSON not an array
+    // for (p in myData) {
+    //     const item = myData[p];
+    //     const x = int(item.x)
+    //     const y = int(item.y)
+    //     fill(item.color);
+    //     ellipse(x, y, 40, 40)
+    // }
+        myDots.forEach(item => {
+            item.display()
+        })
+    
+
+}
+
+function mousePressed(){
+    myDots.forEach(item => {
+        item.intersects()
+    })
+}
+
+
+class Dot{
+    constructor(_x, _y, _color, _id){
+        this.x = _x;
+        this.y = _y;
+        this.id = _id;
+        this.color = _color;
+        this.remove = this.remove.bind(this);
+    }
+
+    intersects(){
+        let d = dist(mouseX, mouseY, this.x, this.y);
+        if (d < 20) {
+            this.remove();
+          }
+    }
+
+    remove(){
+        // see issue with readable stream: https://stackoverflow.com/questions/40385133/retrieve-data-from-a-readablestream-object
+        console.log('removing!', this.id)
+        fetch(`/api/${this.id}`, {method:'DELETE'}).then( result => {
+            updateMyDots()
+        })
+    }
+
+    display(){
+        fill(this.color);
+        ellipse(this.x, this.y, 40, 40)
+    }
+}
+```
+
+![image of removing dots, before]()
+![image of removing dots, after]()
+
+
+## PUT - Updating the color an object
+
+Lastly, what we want to do is update a color of a circle. We have a number of options for achieving this, but for simplicity sake, lets update the color of a circle when a user is pressing the "a" key and clicking the mouse at the same time. I know, kind of a silly way to acheive this, but it introduces another kind of interaction without too much overhead to our existing code. Let's add an `updateColor()` function to our Dot class.
+
+Notice:
+1. we update our `intersects()` function by adding in "if keyIsPressed" to trigger a color update rather than a delete.
+2. we send a fetch request using PUT as our method
+
+```js
+class Dot{
+    constructor(_x, _y, _color, _id){
+        this.x = _x;
+        this.y = _y;
+        this.id = _id;
+        this.color = _color;
+        this.remove = this.remove.bind(this);
+        this.updateColor = this.updateColor.bind(this);
+    }
+
+    intersects(){
+        let d = dist(mouseX, mouseY, this.x, this.y);
+        if (d < 20) {
+            if(keyIsPressed){
+                this.updateColor();
+            } else{
+                this.remove();
+            }
+          }
+    }
+
+    updateColor(){
+        let colorSelection = colors[floor(random(colors.length))]
+        const options = {
+            method:'PUT',
+            headers: {
+                "Content-Type": "application/json",
+                // "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body:JSON.stringify({"color":colorSelection})
+        }
+        fetch(`/api/${this.id}`, options).then( result => {
+            updateMyDots()
+        })
+    }
+
+    remove(){
+        // see issue with readable stream: https://stackoverflow.com/questions/40385133/retrieve-data-from-a-readablestream-object
+        console.log('removing!', this.id)
+        fetch(`/api/${this.id}`, {method:'DELETE'}).then( result => {
+            updateMyDots()
+        })
+    }
+
+    display(){
+        fill(this.color);
+        ellipse(this.x, this.y, 40, 40)
+    }
+}
+```
+
+
+Our full sketch.js code looks like this:
+
+```js
+let myData;
+let myDots = [];
+const colors = ["AliceBlue", "AntiqueWhite", "Aqua", "Aquamarine", "Azure", "Beige", "Bisque", "Black", "BlanchedAlmond", "Blue", "BlueViolet", "Brown", "BurlyWood", "CadetBlue", "Chartreuse", "Chocolate", "Coral", "CornflowerBlue", "Cornsilk", "Crimson", "Cyan", "DarkBlue", "DarkCyan", "DarkGoldenRod", "DarkGray", "DarkGrey", "DarkGreen", "DarkKhaki", "DarkMagenta", "DarkOliveGreen", "DarkOrange", "DarkOrchid", "DarkRed", "DarkSalmon", "DarkSeaGreen", "DarkSlateBlue", "DarkSlateGray", "DarkSlateGrey", "DarkTurquoise", "DarkViolet", "DeepPink", "DeepSkyBlue", "DimGray", "DimGrey", "DodgerBlue", "FireBrick", "FloralWhite", "ForestGreen", "Fuchsia", "Gainsboro", "GhostWhite", "Gold", "GoldenRod", "Gray", "Grey", "Green", "GreenYellow", "HoneyDew", "HotPink", "IndianRed", "Indigo", "Ivory", "Khaki", "Lavender", "LavenderBlush", "LawnGreen", "LemonChiffon", "LightBlue", "LightCoral", "LightCyan", "LightGoldenRodYellow", "LightGray", "LightGrey", "LightGreen", "LightPink", "LightSalmon", "LightSeaGreen", "LightSkyBlue", "LightSlateGray", "LightSlateGrey", "LightSteelBlue", "LightYellow", "Lime", "LimeGreen", "Linen", "Magenta", "Maroon", "MediumAquaMarine", "MediumBlue", "MediumOrchid", "MediumPurple", "MediumSeaGreen", "MediumSlateBlue", "MediumSpringGreen", "MediumTurquoise", "MediumVioletRed", "MidnightBlue", "MintCream", "MistyRose", "Moccasin", "NavajoWhite", "Navy", "OldLace", "Olive", "OliveDrab", "Orange", "OrangeRed", "Orchid", "PaleGoldenRod", "PaleGreen", "PaleTurquoise", "PaleVioletRed", "PapayaWhip", "PeachPuff", "Peru", "Pink", "Plum", "PowderBlue", "Purple", "RebeccaPurple", "Red", "RosyBrown", "RoyalBlue", "SaddleBrown", "Salmon", "SandyBrown", "SeaGreen", "SeaShell", "Sienna", "Silver", "SkyBlue", "SlateBlue", "SlateGray", "SlateGrey", "Snow", "SpringGreen", "SteelBlue", "Tan", "Teal", "Thistle", "Tomato", "Turquoise", "Violet", "Wheat", "White", "WhiteSmoke", "Yellow", "YellowGreen"]
+let postButton;
+
+function preload() {
+    myData = loadJSON("/api");
+}
+
+function setup() {
+    createCanvas(400, 400);
+
+    // Initialize the view with myDots
+    // NOTICE: the x, y values are now strings rather than integers
+    console.log(myData);
+    for (p in myData) {
+        const item = myData[p];
+        const x = int(item.x);
+        const y = int(item.y);
+        myDots.push(new Dot(item.x, item.y, item.color, item._id))
+    }
+
+    postButton = createButton("add new circle")
+    postButton.mousePressed(handlePost);
+
+}
+
+function handlePost(e) {
+    console.log('adding new circle!')
+    let colorSelection = colors[floor(random(colors.length))]
+    let newCircle = {
+        "color": colorSelection,
+        "x": floor(random(width)),
+        "y": floor(random(height))
+    }
+    httpPost("/api", newCircle, (result) => {
+        // the result logs the object you submited
+        console.log(result)
+        // get the latest data and update myData
+        updateMyDots()
+    })
+}
+
+function updateMyDots() {
+    // clear myDots
+    myDots = [];
+    loadJSON("/api", (result) => {
+        myData = result;
+        for (p in myData) {
+            const item = myData[p];
+            const x = int(item.x);
+            const y = int(item.y);
+            myDots.push(new Dot(item.x, item.y, item.color, item._id))
+        }
+    });
+}
+
+function draw() {
+    background(200);
+
+    myDots.forEach(item => {
+        item.display()
+    })
+}
+
+function mousePressed() {
+    myDots.forEach(item => {
+        item.intersects()
+    })
+}
+
+class Dot {
+    constructor(_x, _y, _color, _id) {
+        this.x = _x;
+        this.y = _y;
+        this.id = _id;
+        this.color = _color;
+        this.remove = this.remove.bind(this);
+        this.updateColor = this.updateColor.bind(this);
+    }
+
+    intersects() {
+        let d = dist(mouseX, mouseY, this.x, this.y);
+        if (d < 20) {
+            if (keyIsPressed) {
+                this.updateColor();
+            } else {
+                this.remove();
+            }
+        }
+    }
+
+    updateColor() {
+        let colorSelection = colors[floor(random(colors.length))]
+        const options = {
+            method: 'PUT',
+            headers: {
+                "Content-Type": "application/json",
+                // "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: JSON.stringify({
+                "color": colorSelection
+            })
+        }
+        fetch(`/api/${this.id}`, options).then(result => {
+            updateMyDots()
+        })
+    }
+
+    remove() {
+        // see issue with readable stream: https://stackoverflow.com/questions/40385133/retrieve-data-from-a-readablestream-object
+        console.log('removing!', this.id)
+        fetch(`/api/${this.id}`, {
+            method: 'DELETE'
+        }).then(result => {
+            updateMyDots()
+        })
+    }
+
+    display() {
+        fill(this.color);
+        ellipse(this.x, this.y, 40, 40)
+    }
+}
+```
+
+![image of changing color]()
+![image of changing color]()
+
+Lastly we can include some instructions on our `index.html` on how to interact with our application
+
+In your index.html file. Add this to your markup.
+```html
+<ul>
+    <li>🖌 Change colors: press any key + click on the dot </li>
+    <li>🔥 Remove a dot: click on the dot </li>
+</ul>
+```
+
+![final result]()
+
+
+**Woohoo! You've now built a fullstack web application. You should be proud. The creative universe is now at your fingertips...sort of. With practice and diving in deeper, you can start to add more complexity to your application. For now, you have a basic framework for interacting with server side programs and persistent databases.**
 
 
 
@@ -1218,10 +2036,12 @@ app.delete('/api/:id', (request, response) => {
 ***
 # Future directions
 ***
-
+- simple logging with the morgan library
 - express view rendering
 - http & https
+- authentication 👻
 - exploring the middleware universe
+- see featherjs with p5.js example
 
 
 

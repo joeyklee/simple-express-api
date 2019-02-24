@@ -9,13 +9,16 @@ db.loadDatabase();
 
 const app = express();
 
+// Send files from the public directory
+app.use(express.static( path.resolve(__dirname, 'public') ));
+
 // Handling JSON data 
 app.use(express.json());       // to support JSON-encoded bodies
 app.use(express.urlencoded({extended:true})); // to support URL-encoded bodies
 
 
 app.get("/", (request, response) => {
-    response.send("hello lovely person");
+    response.sendFile("index.html");
 });
 
 // our API
@@ -55,6 +58,9 @@ app.put("/api/:id", (request, response)=> {
     
    // Set an existing field's value
    db.update({ _id: selectedItemId  }, { $set: updatedDataProperties }, (err, numReplaced) => {
+       if(err){
+           response.status(404).send("uh oh! something went wrong on update");
+       }
         // redirect to "GET" all the latest data
         response.redirect("/api")
    });
@@ -67,7 +73,10 @@ app.delete('/api/:id', (request, response) => {
     const selectedItemId = request.params.id;
 
     db.remove({ _id: selectedItemId }, {}, function (err, numRemoved) {
-     // numRemoved = 1
+        if(err){
+           response.status(404).send("uh oh! something went wrong on delete");
+          }
+         // numRemoved = 1
          response.redirect("/api")
       });
 
