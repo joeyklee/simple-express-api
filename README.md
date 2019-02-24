@@ -789,3 +789,439 @@ Now you can delete some data from myData. Use postman to delete a value.
 **🌈Hooray!! Now we've got a fully functioning CRUD API in express 🌈 - take a break, go for a walk, jump up and down and sing a song. This is excellent!!**
 
 
+***
+# CRUD - nedb
+***
+
+In the example we saw above we can write to our data - myData - as long as our server is running, but if anything happens and we need to restart our server our data goes POOF! and disappears. Data persistence is therefore a key feature of web applications. We have SO many options for databases that we can use. Some of you might have heard of mongodb others might be familiar with mySQL. These are fully fledged databases that each have their advantages and considerations.
+
+For prototyping, sometimes it is nice to setup a lightweight method of creating data persistence without all of the overhead of setting up server with a database with database connections - even though doing so is beneficial in  the long run and the more practice you have the easier it gets. For our purposes we can use something more lightweight. Popular lightweight databases like SQlite and NedB are good for this kind of usecase. 
+
+Since nedb is basically mongodb, it is great because should you decide to switch it out for mongodb later, you can do so with little changes to your application. Let's get started.
+
+## Install nedb
+
+install nedb by:
+
+```sh
+npm install nedb
+```
+
+To setup nedb, we have to follow a few steps. It goes something like this:
+
+1. create a folder where your nedb will live: /db
+2. add the required dependencies to your index.js and then set the path to your "database"
+3. load up your data to your server when your application starts
+
+
+## Step 1 make a folder called "db" in your root director
+
+![images of creating a new folder]()
+![images of creating a new folder named db]()
+
+## Step 2 & 3: add dependencies and load up your data
+
+After express is required, bring in the following:
+1. path - helps us handle path variables
+2. require nedb
+3. get the path to our nedb instance
+4. define db by creating a new Datastore and setting the path to our "pathToData"
+5. Load up our database 
+```js
+const express = require('express');
+
+// step 1
+const path = require('path');
+// step 2
+// Type 3: Persistent datastore with automatic loading
+const Datastore = require('nedb');
+// step 3
+const pathToData = path.resolve(__dirname, "db/db")
+// step 4
+const db = new Datastore({ filename: pathToData});
+// step 5
+db.loadDatabase();
+
+const app = express();
+
+// Handling JSON data 
+app.use(express.json());       // to support JSON-encoded bodies
+app.use(express.urlencoded({extended:true})); // to support URL-encoded bodies
+
+```
+
+Our application will now look like this:
+
+```js
+const express = require('express');
+
+const path = require('path');
+// Type 3: Persistent datastore with automatic loading
+const Datastore = require('nedb');
+const pathToData = path.resolve(__dirname, "db/db")
+const db = new Datastore({ filename: pathToData});
+db.loadDatabase();
+
+const app = express();
+
+// Handling JSON data 
+app.use(express.json());       // to support JSON-encoded bodies
+app.use(express.urlencoded({extended:true})); // to support URL-encoded bodies
+
+let myData = [
+    {id:1, color:"red", x:50, y: 200},
+    {id:2, color:"orange", x:100, y: 200},
+    {id:3, color:"yellow", x:150, y: 200},
+    {id:4, color:"green", x:200, y: 200},
+    {id:5, color:"blue", x:250, y: 200},
+    {id:6, color:"purple", x:300, y: 200}
+];
+
+app.get("/", (request, response) => {
+    response.send("hello lovely person");
+});
+
+// our API
+// GET - /api
+app.get("/api", (request, response) => {
+    response.json(myData);
+});
+
+// POST - /api
+app.post("/api", (request, response) => {
+    // create a random ID to reference your data later on
+    let randomId = Math.floor(Math.random()*1000);
+    // Take our data from request.body and add the randomId to it as an id property
+    const newData = Object.assign({id: randomId}, request.body);
+    // push this newData object into myData
+    myData.push(newData);
+    // return the updated data - here we can do a number of things, redirect to a new page, etc. For now, let's send the updated data.
+    response.json(myData)
+});
+
+
+// PUT - /api
+app.put("/api/:id", (request, response)=> {
+    // we get the id of the item we want from request.params.id ==> this matches the :id of the URL parameter
+    const selectedItemId = request.params.id;
+    const updatedDataProperties = request.body
+
+    // now find the item in our myData
+    let selectedItem = myData.find(item => {
+        return item.id === Number(selectedItemId)
+    });
+
+    // if our data is undefined then send a 404 error and send this message
+    if(selectedItem == undefined){
+        response.status(404).send("oops! we couldn't find that data!");
+    }
+
+    // for the properties in the incoming json, update our selected object 
+    for(p in updatedDataProperties){
+        selectedItem[p] = updatedDataProperties[p]
+    }
+
+    // update myData with the updated data
+    myData.map(item => {
+        if(item.id === Number(selectedItemId)){
+            return selectedItem
+        } else {
+            return item
+        }
+    });
+
+    response.json(myData)
+});
+
+
+app.delete('/api/:id', (request, response) => {
+    // we get the id of the item we want from request.params.id ==> this matches the :id of the URL parameter
+    const selectedItemId = request.params.id;
+
+    // use the .filter() function to return all values not matching that id and overwrite myData
+    const newData = myData.filter(item => {
+        return item.id !== Number(selectedItemId)
+    })
+
+    // console.log(myData.length)
+    myData = newData;
+
+    response.json(myData);
+})
+
+
+app.listen(3030, () => {
+    console.log("check out the magic at: http://localhost:3030")
+})
+
+```
+
+**Now it's time to refactor our code to use NEDB instead of using in-memory myData**
+
+
+<!-- ## Move your myData array into your `/db/db` file
+
+You'll notice that we reference `const pathToData = path.resolve(__dirname, "db/db")` as the path to our data. If you're server has been running in dev mode, you'll notice that a file called `db` has now been created. It has no file extension, but you can believe that it is the place where nedb will look into that file to retrieve, create, update, and delete JSON objects.
+
+Since we want our db to start with some inital values, let's move the objects from our  `myData` array into that `db` file.
+
+![image of db file with intial objects]()
+
+What we now have to do is refactor our code so that we retrieve, update, and delete data using nedb. Let's do this! -->
+
+## remove myData
+
+You'll notice that we reference `const pathToData = path.resolve(__dirname, "db/db")` as the path to our data. If you're server has been running in dev mode, you'll notice that a file called `db` has now been created. It has no file extension, but you can believe that it is the place where nedb will look into that file to retrieve, create, update, and delete JSON objects.
+
+For now, let's remove the myData array. We can fill it with values with a POST request which we will refactor now.
+
+## Refactor POST request using NEDB
+
+we use the `db.insert()` command to insert new data into our database. The cool thing is that nedb will create a unique "_id" property to our incoming data. For good measure, let's just add in a date/time stamp so we know when our data was created.
+
+```js
+app.post("/api", (request, response) => {
+    // our unix timestamp
+    const unixTimeCreated = new Date().getTime();
+    // add our unix time as a "created" property and add it to our request.body
+    const newData = Object.assign({"created": unixTimeCreated}, request.body)
+
+    // add in our data object to our database using .insert()
+    db.insert(newData, (err, docs) =>{
+        if(err){
+            return err;
+        }
+        response.json(docs);
+    });
+})
+```
+let's test this out!
+
+Fire up postman and add in some data with the following properties:
+
+```js
+{color:"red", x:50, y: 200}
+```
+
+![image of adding in data using POST request]()
+
+
+WOW! amazing now we've got our first data entry living in our db
+
+![image of db entry]()
+
+Now make post requests with the following data. NOTE: you'll have to do this individually for each POST:
+
+```js
+{color:"orange", x:100, y: 200}
+{color:"yellow", x:150, y: 200}
+{color:"green", x:200, y: 200}
+{color:"blue", x:250, y: 200}
+{color:"purple", x:300, y: 200}
+```
+
+For examples:
+
+![image of POSTing more data]()
+
+In the next step we can rewrite our GET request to retrieve data from our database.
+
+## Refactor GET request using NEDB
+
+Let's write our first "database" query to retrieve data for a GET  request. If you look at the reference of nedb, you'll see that actually it looks exactly like mongodb's structure. 
+
+```js
+
+// GET - /api
+app.get("/api", (request, response) => {    
+    // db references our nedb instance
+    // we use "find" and an empty search {} to give us back all the data in the db
+    db.find({}, function (err, docs) {
+        if(err){
+            return err;
+        } 
+        // like before we send the json response
+        response.json(docs);
+    });
+});
+```
+
+Now in postman, give this a try. Make a GET request to `localhost:3030/api`
+
+![image of get request returned]()
+
+
+Up to this point our full code should look like this:
+
+```js
+const express = require('express');
+
+const path = require('path');
+// Type 3: Persistent datastore with automatic loading
+const Datastore = require('nedb');
+const pathToData = path.resolve(__dirname, "db/db")
+const db = new Datastore({ filename: pathToData});
+db.loadDatabase();
+
+const app = express();
+
+// Handling JSON data 
+app.use(express.json());       // to support JSON-encoded bodies
+app.use(express.urlencoded({extended:true})); // to support URL-encoded bodies
+
+
+app.get("/", (request, response) => {
+    response.send("hello lovely person");
+});
+
+// our API
+// GET - /api
+app.get("/api", (request, response) => {    
+    db.find({}, function (err, docs) {
+        if(err){
+            return err;
+        } 
+        response.json(docs);
+    });
+});
+
+// POST - /api
+app.post("/api", (request, response) => {
+    // our unix timestamp
+    const unixTimeCreated = new Date().getTime();
+    // add our unix time as a "created" property and add it to our request.body
+    const newData = Object.assign({"created": unixTimeCreated}, request.body)
+
+    // add in our data object to our database using .insert()
+    db.insert(newData, (err, docs) =>{
+        if(err){
+            return err;
+        }
+        response.json(docs);
+    });
+})
+
+
+// PUT - /api
+app.put("/api/:id", (request, response)=> {
+    // we get the id of the item we want from request.params.id ==> this matches the :id of the URL parameter
+    const selectedItemId = request.params.id;
+    const updatedDataProperties = request.body
+
+    // now find the item in our myData
+    let selectedItem = myData.find(item => {
+        return item.id === Number(selectedItemId)
+    });
+
+    // if our data is undefined then send a 404 error and send this message
+    if(selectedItem == undefined){
+        response.status(404).send("oops! we couldn't find that data!");
+    }
+
+    // for the properties in the incoming json, update our selected object 
+    for(p in updatedDataProperties){
+        selectedItem[p] = updatedDataProperties[p]
+    }
+
+    // update myData with the updated data
+    myData.map(item => {
+        if(item.id === Number(selectedItemId)){
+            return selectedItem
+        } else {
+            return item
+        }
+    });
+
+    response.json(myData)
+});
+
+
+app.delete('/api/:id', (request, response) => {
+    // we get the id of the item we want from request.params.id ==> this matches the :id of the URL parameter
+    const selectedItemId = request.params.id;
+
+    // use the .filter() function to return all values not matching that id and overwrite myData
+    const newData = myData.filter(item => {
+        return item.id !== Number(selectedItemId)
+    })
+
+    // console.log(myData.length)
+    myData = newData;
+
+    response.json(myData);
+})
+
+
+app.listen(3030, () => {
+    console.log("check out the magic at: http://localhost:3030")
+})
+```
+
+We now have to update our PUT and our DELETE endpoints. 
+
+## Refactor PUT
+
+See: https://github.com/louischatriot/nedb#updating-documents
+
+```js
+
+// PUT - /api
+app.put("/api/:id", (request, response)=> {
+    // we get the id of the item we want from request.params.id ==> this matches the :id of the URL parameter
+    const selectedItemId = request.params.id;
+    const updatedDataProperties = request.body
+
+    
+   // Set an existing field's value
+   db.update({ _id: selectedItemId  }, { $set: updatedDataProperties }, (err, numReplaced) => {
+        // redirect to "GET" all the latest data
+        response.redirect("/api")
+   });
+
+});
+
+```
+
+![image of PUT using nedb in action]()
+
+## Refactor DELETE
+
+Lastly we refactor our DELETE method with the following
+
+```js
+
+app.delete('/api/:id', (request, response) => {
+    // we get the id of the item we want from request.params.id ==> this matches the :id of the URL parameter
+    const selectedItemId = request.params.id;
+
+    db.remove({ _id: selectedItemId }, {}, function (err, numRemoved) {
+     // numRemoved = 1
+         response.redirect("/api")
+      });
+
+})
+
+```
+
+![image of removing doc with postman]()
+
+
+**🌈 and there you have it! you've just built a full CRUD API with express**.
+
+***
+# A simple frontend and static web server
+***
+
+
+
+
+***
+# Future directions
+***
+
+- express view rendering
+- http & https
+- exploring the middleware universe
+
+
+
