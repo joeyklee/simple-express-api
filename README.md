@@ -25,10 +25,13 @@ NOTE: this assumes you have node.js installed on your machine.
 
 Lets's start by making a new folder. We use the `mkdir <folder name>` command to make a new folder on your computer. I will be calling my project `simple-express-api` but you can call it whatever you'd like.
 
+![](assets/screenshot_001.png)
+
 ```sh
 mkdir simple-express-api
 ```
 
+![](assets/screenshot_003.png)
 Now change directories using the `cd </path/to/folder>`
 
 ```sh
@@ -44,9 +47,12 @@ In the next steps we are going to:
 
 ## Initialize your node.js project
 
+
 ```sh
 npm init
 ```
+
+![](assets/screenshot_004.png)
 
 The command `npm init` creates a file called `package.json` that includes all the details of your project. These details include the project name, description, the dependencies which, as you will see, become included in this project whenever you do `npm install <library name>`. This is what allows others to take your project and run `npm install` to also get all the dependencies for your project. 
 
@@ -54,12 +60,14 @@ You can think of your `package.json` file (and your README) as the place that co
 
 You can take some time to fill in the details of your project. These details might look like this:
 
-(insert gif here)
+![](assets/screenshot_008.png)
 
 
-
+![](assets/screenshot_009.png)
 
 ## Install your project dependencies
+
+![](assets/screenshot_010.png)
 
 
 ### npm install express
@@ -80,13 +88,16 @@ added 48 packages from 36 contributors and audited 121 packages in 2.519s
 found 0 vulnerabilities)
 ```
 
+![](assets/screenshot_011.png)
+![](assets/screenshot_012.png)
+
 And if you look in your `simple-express-api` folder, that you've now got a folder called `node_modules` and it's full of subfolders. These subfolders contain the dependencies that allow Express.js to be Express! 
 
 ### Open your folder in your text editor
 
 If you haven't already, open up your project folder in your text editor so you can see all the things. I'm using VSCode, but here's what it looks like in sublime text.
 
-![]()
+![](assets/screenshot_018.png)
 
 ### add a .gitignore file
 
@@ -100,12 +111,15 @@ We can do this a couple ways. Via the terminal we can do it like this -- this sa
 echo "node_modules" >> .gitignore
 ```
 
-(add image)
+
+![](assets/screenshot_013.png)
+![](assets/screenshot_014.png)
+![](assets/screenshot_015.png)
 
 We can also do this using your text editor like so:
 
-(image of add new file)
-(image of adding in text)
+![](assets/screenshot_016.png)
+![](assets/screenshot_017.png)
 
 
 **we will be adding more dependencies as we move on, but for now, let's keep it as raw as possible. Next step: add your `index.js` file.
@@ -133,7 +147,8 @@ const express = require('express');
 
 ```
 
-![image of requiring the express library]()
+
+![image of requiring the express library](assets/screenshot_019.png)
 
 ## initialize your express app
 
@@ -185,6 +200,8 @@ app.listen(3030, () => {
 
 ```
 
+![](assets/screenshot_021.png)
+
 **Now we have all the pieces of a super duper simple but functional server side API for GET requests**.
 
 Let's test this out.
@@ -197,7 +214,7 @@ In order to run our application, we can simply run
 node index.js
 ```
 
-![]()
+![](assets/screenshot_022.png)
 
 If all is well, we should see the message we wrote above:
 
@@ -209,13 +226,13 @@ check out the magic at: http://localhost:3030
 
 You'll now see our message there: `hello lovely person`
 
-![]()
+![](assets/screenshot_023.png)
 
 ## To stop your server: `control + c`
 
 Now that we know our application works, let's stop it and keep developing, To stop any terminal process, you can use: `control + c` to stop the server from running.
 
-![image of stopping the server]() 
+![image of stopping the server](assets/screenshot_024.png) 
 
 ## Adding scripts to package.json: `npm start`
 
@@ -223,11 +240,11 @@ In order to run our application, we can simply run `node index.js` BUT we want t
 
 To do this we're going to go into our `package.json` and add under `scripts`, the following:
 
-![image of adding "start" to scripts]()
+![image of adding "start" to scripts](assets/screenshot_025.png)
 
 Now if you run in your terminal `npm start`, it will start up your application: 
 
-![image of terminal window at npm start]()
+![image of terminal window at npm start](assets/screenshot_026.png)
 
 
 ## Adding scripts to package.json: `npm run dev`
@@ -240,13 +257,17 @@ There is a package called `nodemon` that will take care of this for us. We can a
 npm install nodemon --save-dev
 ```
 
+![](assets/screenshot_028.png)
+
 The `--save-dev` flag saves this as a dev-dependency which is different from the normal dependencies in that it is only necessary for development of your application, not running it in production.
 
 Now we can add to our scripts "dev", like so:
 
-![image of adding dev to scripts]()
+![image of adding dev to scripts](assets/screenshot_027.png)
 
 Now if you run `npm run dev`, your server will tell you that it's "watching ..." which just means that it's watching for any changes to any files in your project directory. 
+
+![image of adding dev to scripts](assets/screenshot_029.png)
 
 
 ## Aside: adding nodemon globally to help with your project
@@ -258,6 +279,8 @@ npm install -g nodemon
 ```
 
 **If you've made it this far, pat yourself on the back! You're diving into this whole new universe of server side development which can feel very foreign and intimidating, but with practice, you'll be whipping up these little applications like no one's business. Take a break and let's come back to building some of our API endpoints for achieving "CRUD".
+
+
 
 ***
 # CRUD with in-memory data
@@ -272,6 +295,10 @@ Let's spec it out.
 In order to create data on our server, we can accept data that comes in via POST request. We can send data as JSON, text, and a number of other formats. If we require uses to be authenticated in order to create data in our database, we'd require authentication headers etc, but we won't worrry about this for now. 
 
 Imagine `<route>` to be some route to your server for example, at the root url: "/" or at the url endpoint: "/api"
+
+
+![](assets/screenshot_031.png)
+![](assets/screenshot_030.png)
 
 ### CREATE - POST
 
@@ -388,7 +415,7 @@ app.listen(3030, () => {
 
 NOW, for the magic moment. Go to `http://localhost:3030/api` you will see your data rendered in your web browser!
 
-![image of all the json data sent to your client]()
+![image of all the json data sent to your client](assets/screenshot_032.png)
 
 This is totally awesome. Because it means now, we can send data that lives on our server ANYWHERE. It can be accessed via the url we specified for everyone to enjoy.
 
@@ -399,17 +426,17 @@ Postman is a tool for API development. It is a user interface for testing your A
 Download Postman so we can use a nice GUI to make a POST request to add some data to our database.
 
 [Postman homepage](https://www.getpostman.com/)
-![postman homepage image]()
+![postman homepage image](assets/screenshot_034.png)
 
 ### Postman interface
 
 You can see in our postman interface that we have something like this:
 
-![image of interface]()
+![image of interface](assets/screenshot_035.png)
 
 You can also see that in our dropdown menu, we have all the API METHODS we'll ever want.
 
-![image of postman api methods]()
+![image of postman api methods](assets/screenshot_036.png)
 
 ### Testing GET
 
@@ -417,10 +444,10 @@ In our postman, let's test our our GET request we just made to see if Postman is
 
 if you set the methods tab to `GET` and the url to : `localhost:3030/api` and press `send` you'll get the following:
 
-![image of url]()
-![image of results]()
+![image of url](assets/screenshot_037.png)
+![image of results](assets/screenshot_038.png)
 
-Hooray! Postamn is sending a GET request to our API and it is behaving as expected. Now we can go carry on an build in the API route to handle a POST request. We can test our if it works using postman in a bit.
+Hooray! Postman is sending a GET request to our API and it is behaving as expected. Now we can go carry on an build in the API route to handle a POST request. We can test our if it works using postman in a bit.
 
 
 ## POST - send data to the server 
@@ -498,7 +525,7 @@ Now you can make a POST request using Postman. Here I'm sending the JSON as `x-w
 {color:"red", x:200, y: 200}
 ```
 
-![image of postman POST request]()
+![image of postman POST request](assets/screenshot_039.png)
 
 You should get a nice response with your updated data! 
 
@@ -658,7 +685,7 @@ app.listen(3030, () => {
 
 Now make a PUT request to postman. Let's change the first instance of our data from `color:"red"` to `color: "turqoise"`
 
-![image of PUT request]()
+![image of PUT request](assets/screenshot_040.png)
 
 
 ## DELETE - delete something from our database!
@@ -783,7 +810,7 @@ app.listen(3030, () => {
 
 Now you can delete some data from myData. Use postman to delete a value.
 
-![removing object with id: 1]()
+![removing object with id: 1](assets/screenshot_043.png)
 
 
 **🌈Hooray!! Now we've got a fully functioning CRUD API in express 🌈 - take a break, go for a walk, jump up and down and sing a song. This is excellent!!**
@@ -816,8 +843,8 @@ To setup nedb, we have to follow a few steps. It goes something like this:
 
 ## Step 1 make a folder called "db" in your root director
 
-![images of creating a new folder]()
-![images of creating a new folder named db]()
+![images of creating a new folder](assets/screenshot_044.png)
+![images of creating a new folder named db](assets/screenshot_045.png)
 
 ## Step 2 & 3: add dependencies and load up your data
 
@@ -1003,12 +1030,12 @@ Fire up postman and add in some data with the following properties:
 {color:"red", x:50, y: 200}
 ```
 
-![image of adding in data using POST request]()
+![image of adding in data using POST request](assets/screenshot_049.png)
 
 
 WOW! amazing now we've got our first data entry living in our db
 
-![image of db entry]()
+![image of db entry](assets/screenshot_050.png)
 
 Now make post requests with the following data. NOTE: you'll have to do this individually for each POST:
 
@@ -1022,7 +1049,11 @@ Now make post requests with the following data. NOTE: you'll have to do this ind
 
 For examples:
 
-![image of POSTing more data]()
+![image of POSTing more data](assets/screenshot_051.png)
+
+![image of POSTing more data](assets/screenshot_052.png)
+
+![image of POSTing more data](assets/screenshot_053.png)
 
 In the next step we can rewrite our GET request to retrieve data from our database.
 
@@ -1048,7 +1079,7 @@ app.get("/api", (request, response) => {
 
 Now in postman, give this a try. Make a GET request to `localhost:3030/api`
 
-![image of get request returned]()
+![image of get request returned](![image of POSTing more data](assets/screenshot_055.png))
 
 
 Up to this point our full code should look like this:
@@ -1201,7 +1232,7 @@ app.put("/api/:id", (request, response)=> {
 
 ```
 
-![image of PUT using nedb in action]()
+![image of PUT using nedb in action](![image of POSTing more data](assets/screenshot_056.png))
 
 ## Refactor DELETE
 
@@ -1227,7 +1258,7 @@ app.delete('/api/:id', (request, response) => {
 
 ```
 
-![image of removing doc with postman]()
+![image of removing doc with postman](![image of POSTing more data](assets/screenshot_057.png))
 
 
 **🌈 and there you have it! you've just built a full CRUD API with express**.
@@ -1359,10 +1390,12 @@ app.use(express.urlencoded({extended:true})); // to support URL-encoded bodies
 
 Now we can create a folder called `public` in our root directory:
 
-![image of creating a public folder in root]()
-![image of creating a public folder in root]()
+![image of creating a public folder in root](![image of POSTing more data](assets/screenshot_060.png))
+
+![image of creating a public folder in root](![image of POSTing more data](assets/screenshot_061.png))
 
 And last create an `index.html` and `sketch.js` file with some boilerplate p5.js code to start.
+
 
 In index.html
 
@@ -1512,7 +1545,7 @@ app.listen(3030, () => {
 
 Now go to your web browser and check: `localhost:3030/` and see that your sketch us being served at the root URL. This is just delightful.
 
-![image of blank sketch]()
+![image of blank sketch](![image of POSTing more data](assets/screenshot_062.png))
 
 
 ## Now we can write some javascript to interact with our API.
@@ -1571,7 +1604,7 @@ function draw(){
 }
 ```
 
-![image of colored circles on canvas]()
+![image of colored circles on canvas](assets/screenshot_064.png)
 
 
 ## Posting data to our database
@@ -1651,7 +1684,7 @@ function draw() {
 
 your view should now look something like this:
 
-![image of updating the circles shown on mousePressed of the button]()
+![image of updating the circles shown on mousePressed of the button](assets/screenshot_066.png)
 
 
 ## Deleting Data
@@ -1818,8 +1851,8 @@ class Dot{
 }
 ```
 
-![image of removing dots, before]()
-![image of removing dots, after]()
+![image of removing dots, before](assets/screenshot_067.png)
+![image of removing dots, after](assets/screenshot_068.png)
 
 
 ## PUT - Updating the color an object
@@ -2012,8 +2045,8 @@ class Dot {
 }
 ```
 
-![image of changing color]()
-![image of changing color]()
+![image of changing color](assets/screenshot_069.png)
+![image of changing color](assets/screenshot_070.png)
 
 Lastly we can include some instructions on our `index.html` on how to interact with our application
 
@@ -2025,8 +2058,9 @@ In your index.html file. Add this to your markup.
 </ul>
 ```
 
-![final result]()
+![final result](assets/screenshot_071.png)
 
+![final result](assets/screenshot_072.png)
 
 **Woohoo! You've now built a fullstack web application. You should be proud. The creative universe is now at your fingertips...sort of. With practice and diving in deeper, you can start to add more complexity to your application. For now, you have a basic framework for interacting with server side programs and persistent databases.**
 
@@ -2036,6 +2070,9 @@ In your index.html file. Add this to your markup.
 ***
 # Future directions
 ***
+
+We didn't get into a bunch of things, but here's some things you can think about later on. A great book reference for all this is Express in Action: https://www.manning.com/books/express-in-action
+
 - simple logging with the morgan library
 - express view rendering
 - http & https
